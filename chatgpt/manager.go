@@ -2,7 +2,6 @@ package chatgpt
 
 import (
 	"context"
-	"net/http"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -35,15 +34,22 @@ func NewTask(id string, content string, timeout time.Duration, handler TaskHandl
 }
 
 type TaskManager struct {
+	email        string
+	password     string
 	sessionToken string
+
+	client *ChatGPT
 
 	taskQueue     map[string](chan *Task)
 	taskQueueLock sync.Mutex
 }
 
-func NewTaskManager(sessionToken string) *TaskManager {
+func NewTaskManager(email, password, sessionToken string) *TaskManager {
 	return &TaskManager{
+		email:        email,
+		password:     password,
 		sessionToken: sessionToken,
+		client:       NewChatGPT(email, password, sessionToken),
 		taskQueue:    make(map[string](chan *Task)),
 	}
 }
@@ -65,20 +71,14 @@ func (tm *TaskManager) SendTask(task *Task) {
 				}
 			}()
 
-			httpClient := &http.Client{
-				Transport: &http.Transport{
-					Proxy: http.ProxyFromEnvironment,
-				},
-			}
-			client := NewChatGPTWithClient(tm.sessionToken, httpClient)
-			conversation := client.NewConversation("")
+			conversation := tm.client.NewConversation("")
 
 			for task := range queue {
 				log.Debugf("Handle Task: %+v", task)
 
 				// Handle command
 				if task.content == cmdReset {
-					conversation = client.NewConversation("")
+					conversation = tm.client.NewConversation("")
 					task.handler("Reset conversation done.", nil)
 					continue
 				}

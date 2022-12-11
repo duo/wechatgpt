@@ -9,6 +9,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,7 +20,7 @@ const (
 	apiAddr        = "https://chat.openai.com/api"
 	backendAPIAddr = "https://chat.openai.com/backend-api"
 
-	userAgent          = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36"
+	userAgent          = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36"
 	cookieSessionToken = "__Secure-next-auth.session-token"
 
 	actionNext                = "next"
@@ -32,17 +34,29 @@ const (
 
 type ChatGPT struct {
 	httpClient         *http.Client
+	email              string
+	password           string
 	sessionToken       string
 	accessToken        string
 	accessTokenExpires time.Time
 }
 
-func NewChatGPT(apiKey string) *ChatGPT {
-	return NewChatGPTWithClient(apiKey, http.DefaultClient)
+func NewChatGPT(email string, password string, sessionToken string) *ChatGPT {
+	return NewChatGPTWithClient(
+		email,
+		password,
+		sessionToken,
+		&http.Client{
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+			},
+		})
 }
 
-func NewChatGPTWithClient(sessionToken string, httpClient *http.Client) *ChatGPT {
+func NewChatGPTWithClient(email, password, sessionToken string, httpClient *http.Client) *ChatGPT {
 	return &ChatGPT{
+		email:        email,
+		password:     password,
 		sessionToken: sessionToken,
 		httpClient:   httpClient,
 	}
@@ -58,40 +72,87 @@ func (c *ChatGPT) NewConversation(conversationId string) *Conversation {
 
 func (c *ChatGPT) refreshAccessTokenIfExpired(ctx context.Context) error {
 	if c.accessToken == "" || time.Now().After(c.accessTokenExpires) {
-		url, _ := url.JoinPath(apiAddr, "auth", "session")
-
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-		if err != nil {
-			return err
+		if c.email != "" && c.password != "" {
+			return c.refreshAccessTokenByPassword(ctx)
+		} else {
+			return c.refreshAccessTokenBySessionToken(ctx)
 		}
-
-		req.Header.Set("User-Agent", userAgent)
-		req.AddCookie(&http.Cookie{
-			Name:  cookieSessionToken,
-			Value: c.sessionToken,
-		})
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			return err
-		}
-
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(resp.Body)
-			return fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
-		}
-
-		var authResponse AuthSessionResponse
-		err = json.NewDecoder(resp.Body).Decode(&authResponse)
-		if err != nil {
-			return err
-		}
-
-		c.accessToken = authResponse.AccessToken
-		c.accessTokenExpires = authResponse.Expires
 	}
+
+	return nil
+}
+
+func (c *ChatGPT) refreshAccessTokenByPassword(ctx context.Context) error {
+	auth, err := NewAuthClient(c.email, c.password, "", nil)
+	if err != nil {
+		return err
+	}
+
+	captcha, err := auth.Begin()
+	if err != nil {
+		return err
+	}
+
+	var answer string
+	if captcha.Available() {
+		if err := captcha.ToFile("captcha.png"); err != nil {
+			return err
+		}
+
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Captcha answer: ")
+		answer, err = reader.ReadString('\n')
+		if err != nil {
+			return err
+		}
+		answer = strings.Replace(answer, "\n", "", -1)
+	}
+
+	creds, err := auth.Finish(answer)
+	if err != nil {
+		return err
+	}
+
+	c.accessToken = creds.AccessToken
+	c.accessTokenExpires = creds.ExpiresAt
+
+	return nil
+}
+
+func (c *ChatGPT) refreshAccessTokenBySessionToken(ctx context.Context) error {
+	url, _ := url.JoinPath(apiAddr, "auth", "session")
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("User-Agent", userAgent)
+	req.AddCookie(&http.Cookie{
+		Name:  cookieSessionToken,
+		Value: c.sessionToken,
+	})
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	var authResponse AuthSessionResponse
+	err = json.NewDecoder(resp.Body).Decode(&authResponse)
+	if err != nil {
+		return err
+	}
+
+	c.accessToken = authResponse.AccessToken
+	c.accessTokenExpires = authResponse.Expires
 
 	return nil
 }

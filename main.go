@@ -39,12 +39,19 @@ func main() {
 		taskTimeout = duration
 	}
 
+	email := os.Getenv("CHATGPT_EMAIL")
+	password := os.Getenv("CHATGPT_PASSWORD")
 	sessionToken := os.Getenv("SESSION_TOKEN")
-	if sessionToken == "" {
-		log.Fatal("SESSION_TOKEN is empty")
+
+	if email == "" && password == "" && sessionToken == "" {
+		log.Fatal("Login information is missing")
+	} else if sessionToken == "" && email != "" && password == "" {
+		log.Fatal("Password is empty")
+	} else if sessionToken == "" && email == "" && password != "" {
+		log.Fatal("Email is empty")
 	}
 
-	taskManager := chatgpt.NewTaskManager(sessionToken)
+	taskManager := chatgpt.NewTaskManager(email, password, sessionToken)
 
 	bot := openwechat.DefaultBot(openwechat.Desktop)
 
