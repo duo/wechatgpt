@@ -136,7 +136,8 @@ func handleMesasge(msg *openwechat.Message, taskManager *chatgpt.TaskManager) {
 		func(resp string, err error) {
 			if err != nil {
 				log.Warnf("Failed to get ChatGPT response: %v", err)
-				if _, err := msg.ReplyText("[ERROR] Failed to get ChatGPT response"); err != nil {
+				text := fmt.Sprintf("[ERROR] Failed to get ChatGPT response\n\n%v", err)
+				if _, err := msg.ReplyText(text); err != nil {
 					log.Warnf("Failed to reply: %v", err)
 				}
 			} else {

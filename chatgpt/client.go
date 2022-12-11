@@ -230,7 +230,8 @@ func (c *Conversation) SendMessage(ctx context.Context, message string) (string,
 				break
 			}
 
-			respMessage = data
+			respMessage = make([]byte, len(data))
+			copy(respMessage, data)
 		}
 	}
 
