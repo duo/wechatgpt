@@ -34,23 +34,16 @@ func NewTask(id string, content string, timeout time.Duration, handler TaskHandl
 }
 
 type TaskManager struct {
-	email        string
-	password     string
-	sessionToken string
-
 	client *ChatGPT
 
 	taskQueue     map[string](chan *Task)
 	taskQueueLock sync.Mutex
 }
 
-func NewTaskManager(email, password, sessionToken string) *TaskManager {
+func NewTaskManager(email, password, sessionToken, userAgent, cfClearance string) *TaskManager {
 	return &TaskManager{
-		email:        email,
-		password:     password,
-		sessionToken: sessionToken,
-		client:       NewChatGPT(email, password, sessionToken),
-		taskQueue:    make(map[string](chan *Task)),
+		client:    NewChatGPT(email, password, sessionToken, userAgent, cfClearance),
+		taskQueue: make(map[string](chan *Task)),
 	}
 }
 

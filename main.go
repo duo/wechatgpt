@@ -51,7 +51,10 @@ func main() {
 		log.Fatal("Email is empty")
 	}
 
-	taskManager := chatgpt.NewTaskManager(email, password, sessionToken)
+	cfClearance := os.Getenv("CF_CLEARANCE")
+	userAgent := os.Getenv("USER_AGENT")
+
+	taskManager := chatgpt.NewTaskManager(email, password, sessionToken, userAgent, cfClearance)
 
 	bot := openwechat.DefaultBot(openwechat.Desktop)
 

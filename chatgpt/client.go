@@ -22,6 +22,7 @@ const (
 
 	userAgent          = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36"
 	cookieSessionToken = "__Secure-next-auth.session-token"
+	cookieCfClearance  = "cf_clearance"
 
 	actionNext                = "next"
 	roleUser                  = "user"
@@ -37,15 +38,19 @@ type ChatGPT struct {
 	email              string
 	password           string
 	sessionToken       string
+	userAgent          string
+	cfClearance        string
 	accessToken        string
 	accessTokenExpires time.Time
 }
 
-func NewChatGPT(email string, password string, sessionToken string) *ChatGPT {
+func NewChatGPT(email, password, sessionToken, userAgent, cfClearance string) *ChatGPT {
 	return NewChatGPTWithClient(
 		email,
 		password,
 		sessionToken,
+		userAgent,
+		cfClearance,
 		&http.Client{
 			Transport: &http.Transport{
 				Proxy: http.ProxyFromEnvironment,
@@ -53,11 +58,13 @@ func NewChatGPT(email string, password string, sessionToken string) *ChatGPT {
 		})
 }
 
-func NewChatGPTWithClient(email, password, sessionToken string, httpClient *http.Client) *ChatGPT {
+func NewChatGPTWithClient(email, password, sessionToken, userAgent, cfClearance string, httpClient *http.Client) *ChatGPT {
 	return &ChatGPT{
 		email:        email,
 		password:     password,
 		sessionToken: sessionToken,
+		userAgent:    userAgent,
+		cfClearance:  cfClearance,
 		httpClient:   httpClient,
 	}
 }
@@ -72,7 +79,8 @@ func (c *ChatGPT) NewConversation(conversationId string) *Conversation {
 
 func (c *ChatGPT) refreshAccessTokenIfExpired(ctx context.Context) error {
 	if c.accessToken == "" || time.Now().After(c.accessTokenExpires) {
-		if c.email != "" && c.password != "" {
+		//if c.email != "" && c.password != "" {
+		if c.sessionToken == "" {
 			return c.refreshAccessTokenByPassword(ctx)
 		} else {
 			return c.refreshAccessTokenBySessionToken(ctx)
@@ -127,11 +135,21 @@ func (c *ChatGPT) refreshAccessTokenBySessionToken(ctx context.Context) error {
 		return err
 	}
 
-	req.Header.Set("User-Agent", userAgent)
+	if c.userAgent != "" {
+		req.Header.Set("User-Agent", c.userAgent)
+	} else {
+		req.Header.Set("User-Agent", userAgent)
+	}
 	req.AddCookie(&http.Cookie{
 		Name:  cookieSessionToken,
 		Value: c.sessionToken,
 	})
+	if c.cfClearance != "" {
+		req.AddCookie(&http.Cookie{
+			Name:  cookieCfClearance,
+			Value: c.cfClearance,
+		})
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -197,9 +215,19 @@ func (c *Conversation) SendMessage(ctx context.Context, message string) (string,
 		return "", err
 	}
 
-	req.Header.Set("User-Agent", userAgent)
+	if c.ChatGPT.userAgent != "" {
+		req.Header.Set("User-Agent", c.ChatGPT.userAgent)
+	} else {
+		req.Header.Set("User-Agent", userAgent)
+	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.ChatGPT.accessToken))
 	req.Header.Set("Content-Type", "application/json")
+	if c.ChatGPT.cfClearance != "" {
+		req.AddCookie(&http.Cookie{
+			Name:  cookieCfClearance,
+			Value: c.ChatGPT.cfClearance,
+		})
+	}
 
 	resp, err := c.ChatGPT.httpClient.Do(req)
 	if err != nil {

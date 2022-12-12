@@ -5,14 +5,15 @@ A WeChat ChatGPT bot based on [openwechat](https://github.com/eatmoreapple/openw
 
 *nix
 ```bash
-TASK_TIMEOUT=120s CHATGPT_EMAIL=xxx CHATGPT_PASSWORD=yyy ./wechatgpt
+TASK_TIMEOUT=120s SESSION_TOKEN=xxx CF_CLEARANCE=xxx USER_AGENT=xxx ./wechatgpt
 ```
 
 windows
 ```bash
 set TASK_TIMEOUT=120s
-set CHATGPT_EMAIL=xxx
-set CHATGPT_PASSWORD=yyy
+set SESSION_TOKEN=xxx
+set CF_CLEARANCE=xxx
+set USER_AGENT=xxx
 wechatgpt.exe
 ```
 
@@ -26,10 +27,12 @@ docker
 | `!reset` | Reset ChatGPT conversation |
 
 ### Environment
-|      Variable      | Function                                                |
-| :----------------: | ------------------------------------------------------- |
-|  `CHATGPT_EMAIL`   | ChatGPT email                                           |
-| `CHATGPT_PASSWORD` | ChatGPT password                                        |
-| ~`SESSION_TOKEN`~  | ~ChatGPT __Secure-next-auth.session-token~ `deprecated` |
-|   `TASK_TIMEOUT`   | ChatGPT API query timeout duration                      |
-|   `AUTO_ACCEPT`    | Auto accept WeChat friend request                       |
+|      Variable      | Function                                          |
+| :----------------: | ------------------------------------------------- |
+|  `SESSION_TOKEN`   | ChatGPT cookie `__Secure-next-auth.session-token` |
+|   `CF_CLEARANCE`   | ChatGPT cookie `cf_clearance`                     |
+|    `USER_AGENT`    | Browser user agent                                |
+|   `TASK_TIMEOUT`   | ChatGPT API query timeout duration                |
+|   `AUTO_ACCEPT`    | Auto accept WeChat friend request                 |
+|  `CHATGPT_EMAIL`   | ChatGPT email                                     |
+| `CHATGPT_PASSWORD` | ChatGPT password                                  |
